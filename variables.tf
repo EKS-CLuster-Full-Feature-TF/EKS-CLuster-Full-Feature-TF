@@ -87,7 +87,12 @@ variable "endpoint_private_access" {
 
 variable "endpoint_public_access" {
 }
-
+variable "authentication_mode" {
+default = "API_AND_CONFIG_MAP"
+}
+variable "bootstrap_cluster_creator_admin_permissions" {
+default = true
+}
 ########################################
 # EKS Nodes Settings
 ########################################
