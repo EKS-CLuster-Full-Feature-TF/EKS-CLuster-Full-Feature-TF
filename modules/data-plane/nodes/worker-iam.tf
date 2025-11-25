@@ -1,12 +1,12 @@
 
 #necessary roles for worker nodes
 resource "aws_iam_role" "worker_nodes_role" {
-  name = "${local.cluster_name}-nodes"
+  name = "${var.cluster_name}-nodes"
   tags = {
     Environment = var.env
     Application = var.app_name
     Terraform   = true
-    name        = "${local.cluster_name}-nodes"
+    name        = "${var.cluster_name}-nodes"
   }
   assume_role_policy = jsonencode({
     Statement = [{
@@ -47,5 +47,17 @@ resource "aws_iam_role_policy_attachment" "amazon_ec2_container_registry_read_on
 # enables the SSM (AWS Systems Manager) agent on the nodes. The SSM agent allows users to access the cluster nodes without SSH but with the AWS SSM agent.
 resource "aws_iam_role_policy_attachment" "amazon_ssm_managed_instance_core" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role       = aws_iam_role.worker_nodes_role.name
+}
+
+# Note: ALB Controller now uses IRSA (IAM Roles for Service Accounts) in control-plane module
+# No longer attached to worker node role
+
+resource "aws_iam_role_policy_attachment" "amazon_s3_managed_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+  role       = aws_iam_role.worker_nodes_role.name
+}
+resource "aws_iam_role_policy_attachment" "aws_secret_manager" {
+  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
   role       = aws_iam_role.worker_nodes_role.name
 }

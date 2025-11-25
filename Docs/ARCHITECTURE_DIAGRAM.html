@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EKS Cluster Architecture Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 40px;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        .diagram-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .mermaid {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 4px;
+        }
+        .description {
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border-left: 4px solid #3498db;
+        }
+        .toc {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc li {
+            margin: 10px 0;
+        }
+        .toc a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 EKS Cluster Architecture Diagrams</h1>
+    
+    <div class="toc">
+        <h2>📑 Table of Contents</h2>
+        <ul>
+            <li><a href="#high-level">1. High-Level Architecture</a></li>
+            <li><a href="#component-flow">2. Detailed Component Flow</a></li>
+            <li><a href="#iam">3. IAM Roles and Policies</a></li>
+            <li><a href="#network">4. Network Architecture</a></li>
+            <li><a href="#dependencies">5. Resource Dependencies</a></li>
+            <li><a href="#modules">6. Module Structure</a></li>
+            <li><a href="#security">7. Security Architecture</a></li>
+            <li><a href="#dataflow">8. Data Flow</a></li>
+        </ul>
+    </div>
+
+    <div id="high-level" class="diagram-container">
+        <h2>1. High-Level Architecture</h2>
+        <div class="description">
+            <strong>Overview:</strong> This diagram shows the complete infrastructure stack from networking to Kubernetes components.
+        </div>
+        <div class="mermaid">
+graph TB
+    subgraph "Root Module"
+        VPC_MOD[VPC Module]
+        CLUSTER_MOD[Control Plane Module]
+        NODES_MOD[Nodes Module]
+        ALB_MOD[ALB Controller Module]
+    end
+
+    subgraph "Network Layer"
+        VPC[VPC 10.0.0.0/16]
+        IGW[Internet Gateway]
+        NAT[NAT Gateway]
+        ENI_SUB[ENI Subnets<br/>10.0.1.0/28, 10.0.2.0/28]
+        PRIV_SUB[Private Subnets<br/>10.0.3.0/24, 10.0.4.0/24]
+        PUB_SUB[Public Subnets<br/>10.0.5.0/24, 10.0.6.0/24]
+        DB_SUB[Database Subnets<br/>10.0.7.0/24, 10.0.8.0/24]
+    end
+
+    subgraph "EKS Control Plane"
+        EKS_CLUSTER[EKS Cluster<br/>eks-{region}-{env}-{app}]
+        CLUSTER_ROLE[Cluster IAM Role]
+        VPC_CNI[VPC CNI Addon]
+        KUBE_PROXY[Kube-Proxy Addon]
+        COREDNS[CoreDNS Addon]
+    end
+
+    subgraph "ALB Controller Module"
+        OIDC[OIDC Provider]
+        ALB_ROLE[ALB Controller IAM Role]
+        ALB_POLICY[ALB Controller Policy]
+        SA[ServiceAccount<br/>IRSA]
+        HELM_RELEASE[Helm Release]
+        ALB_CONTROLLER[ALB Controller Pod]
+    end
+
+    subgraph "Data Plane - Worker Nodes"
+        NODE_ROLE[Worker Node IAM Role]
+        LAUNCH_TMPL[Launch Template]
+        NODE_GROUP[EKS Node Group]
+        WORKER_NODES[Worker Nodes<br/>EC2 Instances]
+    end
+
+    VPC_MOD --> VPC
+    VPC_MOD --> IGW
+    VPC_MOD --> NAT
+    VPC_MOD --> ENI_SUB
+    VPC_MOD --> PRIV_SUB
+    VPC_MOD --> PUB_SUB
+    VPC_MOD --> DB_SUB
+
+    CLUSTER_MOD --> EKS_CLUSTER
+    CLUSTER_MOD --> CLUSTER_ROLE
+    CLUSTER_MOD --> VPC_CNI
+    CLUSTER_MOD --> KUBE_PROXY
+    CLUSTER_MOD --> COREDNS
+
+    NODES_MOD --> NODE_ROLE
+    NODES_MOD --> LAUNCH_TMPL
+    NODES_MOD --> NODE_GROUP
+    NODE_GROUP --> WORKER_NODES
+
+    ALB_MOD --> OIDC
+    ALB_MOD --> ALB_ROLE
+    ALB_MOD --> ALB_POLICY
+    ALB_MOD --> SA
+    ALB_MOD --> HELM_RELEASE
+    HELM_RELEASE --> ALB_CONTROLLER
+
+    EKS_CLUSTER --> ENI_SUB
+    NODE_GROUP --> PRIV_SUB
+    WORKER_NODES --> PRIV_SUB
+    ALB_CONTROLLER --> WORKER_NODES
+
+    OIDC --> SA
+    ALB_ROLE --> SA
+    ALB_POLICY --> ALB_ROLE
+
+    PRIV_SUB --> NAT
+    NAT --> IGW
+    PUB_SUB --> IGW
+        </div>
+    </div>
+
+    <div id="component-flow" class="diagram-container">
+        <h2>2. Detailed Component Flow</h2>
+        <div class="description">
+            <strong>Overview:</strong> Shows the sequential creation flow of infrastructure components.
+        </div>
+        <div class="mermaid">
+graph LR
+    subgraph "1. Networking Infrastructure"
+        A[VPC Creation] --> B[Subnet Creation]
+        B --> C[Internet Gateway]
+        B --> D[NAT Gateway]
+        C --> E[Public Route Table]
+        D --> F[Private Route Table]
+    end
+
+    subgraph "2. EKS Control Plane"
+        G[Cluster IAM Role] --> H[EKS Cluster]
+        H --> I[OIDC Provider]
+        H --> J[VPC CNI Addon]
+        H --> K[Kube-Proxy Addon]
+        H --> L[CoreDNS Addon]
+    end
+
+    subgraph "3. ALB Controller Module"
+        I --> M[OIDC Provider]
+        M --> N[ALB IAM Role]
+        N --> O[ALB IAM Policy]
+        O --> P[ServiceAccount]
+        P --> Q[Helm Release]
+        Q --> R[ALB Controller]
+    end
+
+    subgraph "4. Worker Nodes"
+        S[Worker IAM Role] --> T[Launch Template]
+        T --> U[Node Group]
+        U --> V[EC2 Instances]
+    end
+
+    A --> G
+    H --> S
+    R --> V
+        </div>
+    </div>
+
+    <div id="iam" class="diagram-container">
+        <h2>3. IAM Roles and Policies</h2>
+        <div class="description">
+            <strong>Overview:</strong> IAM security architecture showing all roles and their attached policies.
+        </div>
+        <div class="mermaid">
+graph TB
+    subgraph "IAM Roles"
+        CR[Cluster Role<br/>AmazonEKSClusterPolicy]
+        NR[Worker Node Role<br/>Multiple Policies]
+        AR[ALB Controller Role<br/>IRSA]
+    end
+
+    subgraph "Worker Node Policies"
+        NP1[AmazonEKSWorkerNodePolicy]
+        NP2[AmazonEKS_CNI_Policy]
+        NP3[AmazonEC2ContainerRegistryReadOnly]
+        NP4[AmazonSSMManagedInstanceCore]
+        NP5[AmazonS3FullAccess]
+        NP6[SecretsManagerReadWrite]
+    end
+
+    subgraph "ALB Controller Policy"
+        AP[ALB Controller Policy<br/>EC2, ELB, ACM, WAF]
+    end
+
+    CR --> EKS[EKS Cluster]
+    NR --> NP1
+    NR --> NP2
+    NR --> NP3
+    NR --> NP4
+    NR --> NP5
+    NR --> NP6
+    NR --> NODES[Worker Nodes]
+
+    AR --> AP
+    AR --> SA[ServiceAccount<br/>IRSA]
+    SA --> ALB[ALB Controller]
+        </div>
+    </div>
+
+    <div id="network" class="diagram-container">
+        <h2>4. Network Architecture</h2>
+        <div class="description">
+            <strong>Overview:</strong> VPC structure showing all subnets, routing, and network components.
+        </div>
+        <div class="mermaid">
+graph TB
+    subgraph "VPC: 10.0.0.0/16"
+        subgraph "Public Subnets"
+            PS1[Public Subnet 1<br/>10.0.5.0/24<br/>AZ-1]
+            PS2[Public Subnet 2<br/>10.0.6.0/24<br/>AZ-2]
+        end
+
+        subgraph "Private Subnets"
+            PRS1[Private Subnet 1<br/>10.0.3.0/24<br/>AZ-1]
+            PRS2[Private Subnet 2<br/>10.0.4.0/24<br/>AZ-2]
+        end
+
+        subgraph "ENI Subnets"
+            ES1[ENI Subnet 1<br/>10.0.1.0/28<br/>AZ-1]
+            ES2[ENI Subnet 2<br/>10.0.2.0/28<br/>AZ-2]
+        end
+
+        subgraph "Database Subnets"
+            DS1[Database Subnet 1<br/>10.0.7.0/24<br/>AZ-1]
+            DS2[Database Subnet 2<br/>10.0.8.0/24<br/>AZ-2]
+        end
+    end
+
+    IGW[Internet Gateway] --> PS1
+    IGW --> PS2
+
+    NAT[NAT Gateway<br/>in Public Subnet 1] --> PRS1
+    NAT --> PRS2
+
+    EKS[EKS Cluster ENIs] --> ES1
+    EKS --> ES2
+
+    NODES[Worker Nodes] --> PRS1
+    NODES --> PRS2
+
+    PS1 --> IGW
+    PS2 --> IGW
+    PRS1 --> NAT
+    PRS2 --> NAT
+        </div>
+    </div>
+
+    <div id="dependencies" class="diagram-container">
+        <h2>5. Resource Dependencies</h2>
+        <div class="description">
+            <strong>Overview:</strong> Terraform resource creation order and dependencies.
+        </div>
+        <div class="mermaid">
+graph TD
+    START[Terraform Apply] --> VPC[Create VPC]
+    VPC --> SUBNETS[Create Subnets]
+    SUBNETS --> IGW[Create Internet Gateway]
+    SUBNETS --> NAT[Create NAT Gateway]
+    
+    VPC --> CLUSTER_ROLE[Create Cluster IAM Role]
+    CLUSTER_ROLE --> EKS_CLUSTER[Create EKS Cluster]
+    EKS_CLUSTER --> OIDC[Create OIDC Provider]
+    
+    OIDC --> ALB_ROLE[Create ALB IAM Role]
+    ALB_ROLE --> ALB_POLICY[Create ALB Policy]
+    
+    EKS_CLUSTER --> ADDONS[Install EKS Addons]
+    ADDONS --> VPC_CNI[VPC CNI]
+    ADDONS --> KUBE_PROXY[Kube-Proxy]
+    ADDONS --> COREDNS[CoreDNS]
+    
+    EKS_CLUSTER --> NODE_ROLE[Create Worker Node Role]
+    NODE_ROLE --> LAUNCH_TMPL[Create Launch Template]
+    LAUNCH_TMPL --> NODE_GROUP[Create Node Group]
+    NODE_GROUP --> WORKER_NODES[Launch EC2 Instances]
+    
+    EKS_CLUSTER --> SA[Create ServiceAccount]
+    ALB_ROLE --> SA
+    SA --> HELM[Install Helm Chart]
+    HELM --> ALB_CONTROLLER[ALB Controller Running]
+    
+    WORKER_NODES --> ALB_CONTROLLER
+        </div>
+    </div>
+
+    <div id="modules" class="diagram-container">
+        <h2>6. Module Structure</h2>
+        <div class="description">
+            <strong>Overview:</strong> File organization and module hierarchy in the Terraform codebase.
+        </div>
+        <div class="mermaid">
+graph TB
+    subgraph "Root Module"
+        MAIN[main.tf]
+        VARS[variables.tf]
+        PROV[providers.tf]
+    end
+
+    subgraph "modules/data-plane/network"
+        VPC_MAIN[main-vpc.tf<br/>VPC, Subnets, IGW, NAT]
+        VPC_VARS[vpc-variables.tf]
+        VPC_LOCAL[local.tf]
+        VPC_OUT[output.tf]
+    end
+
+    subgraph "modules/control-plane"
+        EKS_TF[eks.tf<br/>Cluster, Addons]
+        IAM_TF[iam.tf<br/>Cluster Role]
+        LOCALS[locals.tf]
+        VARS_CP[variables.tf]
+        OUT[output.tf]
+    end
+
+    subgraph "modules/data-plane/nodes"
+        WORKER_NODE[worker-node.tf<br/>Node Group]
+        WORKER_IAM[worker-iam.tf<br/>Node Role]
+        LAUNCH[launch-tamplate.tf]
+        NODE_SG[node-sq.tf<br/>Security Groups]
+        LOCALS_N[locals.tf]
+        VARS_N[variables.tf]
+    end
+
+    subgraph "modules/alb-controller"
+        ALB_IAM[iam.tf<br/>OIDC, ALB IAM Role/Policy]
+        ALB_K8S[kubernetes.tf<br/>ServiceAccount, Helm]
+        ALB_VARS[variables.tf]
+        ALB_LOCALS[locals.tf]
+        ALB_OUT[output.tf]
+    end
+
+    MAIN --> VPC_MAIN
+    MAIN --> EKS_TF
+    MAIN --> WORKER_NODE
+    MAIN --> ALB_IAM
+    EKS_TF --> IAM_TF
+    WORKER_NODE --> WORKER_IAM
+    WORKER_NODE --> LAUNCH
+    ALB_IAM --> ALB_K8S
+        </div>
+    </div>
+
+    <div id="security" class="diagram-container">
+        <h2>7. Security Architecture</h2>
+        <div class="description">
+            <strong>Overview:</strong> Multi-layered security approach including network, IAM, and instance security.
+        </div>
+        <div class="mermaid">
+graph TB
+    subgraph "Network Security"
+        VPC_SG[VPC Security Groups]
+        CLUSTER_SG[Cluster Security Group]
+        NODE_SG[Node Security Group]
+        ALB_SG[ALB Security Groups<br/>Auto-created]
+    end
+
+    subgraph "IAM Security"
+        IRSA[IRSA - IAM Roles for Service Accounts]
+        OIDC_PROV[OIDC Provider]
+        ALB_ROLE_SEC[ALB Controller Role]
+    end
+
+    subgraph "Instance Security"
+        IMDS[IMDSv2 Required]
+        NO_PUBLIC_IP[No Public IPs]
+        EBS_OPT[EBS Optimized]
+    end
+
+    CLUSTER_SG --> EKS[EKS Cluster]
+    NODE_SG --> NODES[Worker Nodes]
+    ALB_SG --> ALB[Application Load Balancers]
+    
+    OIDC_PROV --> IRSA
+    IRSA --> ALB_ROLE_SEC
+    ALB_ROLE_SEC --> ALB_CONTROLLER[ALB Controller]
+    
+    IMDS --> NODES
+    NO_PUBLIC_IP --> NODES
+    EBS_OPT --> NODES
+        </div>
+    </div>
+
+    <div id="dataflow" class="diagram-container">
+        <h2>8. Data Flow</h2>
+        <div class="description">
+            <strong>Overview:</strong> Request flow from user to application pods through the load balancer.
+        </div>
+        <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant ALB as Application Load Balancer
+    participant Controller as ALB Controller
+    participant EKS as EKS Cluster
+    participant Nodes as Worker Nodes
+    participant Pods as Application Pods
+
+    User->>ALB: HTTP/HTTPS Request
+    ALB->>Pods: Route to Target Group
+    Pods->>Nodes: Process Request
+    Nodes->>EKS: Cluster Communication
+    Controller->>ALB: Manage Load Balancer
+    Controller->>EKS: Watch Ingress Resources
+    EKS->>Nodes: Schedule Pods
+    Nodes->>Pods: Run Containers
+        </div>
+    </div>
+
+    <div class="diagram-container" style="margin-top: 40px; background: #e8f4f8;">
+        <h2>📊 Component Summary</h2>
+        <div style="padding: 20px;">
+            <h3>Infrastructure Components</h3>
+            <ul>
+                <li><strong>1 VPC</strong> with DNS support</li>
+                <li><strong>8 Subnets</strong> (2 ENI, 2 Private, 2 Public, 2 Database)</li>
+                <li><strong>1 Internet Gateway</strong></li>
+                <li><strong>1 NAT Gateway</strong> (conditional)</li>
+                <li><strong>3 Route Tables</strong> (Public, Private, Database)</li>
+            </ul>
+
+            <h3>EKS Components</h3>
+            <ul>
+                <li><strong>1 EKS Cluster</strong> with configurable version</li>
+                <li><strong>3 EKS Addons</strong> (VPC CNI, Kube-Proxy, CoreDNS)</li>
+            </ul>
+
+            <h3>IAM Components</h3>
+            <ul>
+                <li><strong>1 Cluster IAM Role</strong></li>
+                <li><strong>1 Worker Node IAM Role</strong> with 6 attached policies</li>
+                <li><strong>1 ALB Controller IAM Role</strong> with custom policy (in ALB Controller Module)</li>
+                <li><strong>1 ALB Controller IAM Policy</strong> (in ALB Controller Module)</li>
+                <li><strong>1 OIDC Provider</strong> for IRSA (in ALB Controller Module)</li>
+            </ul>
+
+            <h3>Compute Components</h3>
+            <ul>
+                <li><strong>1 Launch Template</strong> for worker nodes</li>
+                <li><strong>1 EKS Node Group</strong> with auto-scaling</li>
+                <li><strong>N Worker Nodes</strong> (EC2 instances, configurable count)</li>
+            </ul>
+
+            <h3>Kubernetes Components (ALB Controller Module)</h3>
+            <ul>
+                <li><strong>1 ServiceAccount</strong> for ALB Controller (IRSA)</li>
+                <li><strong>1 Helm Release</strong> for ALB Controller</li>
+                <li><strong>1 ALB Controller Deployment</strong> (managed by Helm)</li>
+            </ul>
+
+            <h3>Module Structure</h3>
+            <ul>
+                <li><strong>4 Modules</strong>: VPC, Control Plane, Nodes, ALB Controller</li>
+                <li><strong>ALB Controller Module</strong>: Dedicated module for IAM and Kubernetes resources</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>
+

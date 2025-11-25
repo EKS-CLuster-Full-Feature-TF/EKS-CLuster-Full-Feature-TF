@@ -1,0 +1,87 @@
+# Advanced Ingress Example with Multiple Paths and SSL
+# This is an example file showing advanced ALB configuration
+# Uncomment and customize as needed
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-app-advanced
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    
+    # SSL/TLS Configuration (requires ACM certificate)
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:ACCOUNT_ID:certificate/CERT_ID
+    # alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=my-alb-logs-bucket,
+      access_logs.s3.prefix=alb-logs
+    
+    # WAF integration (optional)
+    # alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:region:account:webacl/...
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=prod,
+      Application=EKS-squad-1,
+      ManagedBy=terraform,
+      Team=platform
+    
+    # Additional annotations
+    alb.ingress.kubernetes.io/success-codes: "200,301,302"
+    alb.ingress.kubernetes.io/group.name: "test-app-group"  # Group multiple ingresses
+spec:
+  ingressClassName: alb
+  rules:
+  # Example: Host-based routing
+  - host: test-app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: test-app
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: test-app
+            port:
+              number: 80
+  
+  # Example: Path-based routing to different services
+  # - http:
+  #     paths:
+  #     - path: /app1
+  #       pathType: Prefix
+  #       backend:
+  #         service:
+  #           name: app1-service
+  #           port:
+  #             number: 80
+  #     - path: /app2
+  #       pathType: Prefix
+  #       backend:
+  #         service:
+  #           name: app2-service
+  #           port:
+  #             number: 80
+

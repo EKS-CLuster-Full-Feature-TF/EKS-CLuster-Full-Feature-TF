@@ -1,0 +1,202 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  namespace: default
+  labels:
+    app: test-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-app
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21-alpine
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        # Custom HTML page to show pod information
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html
+        configMap:
+          name: test-app-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-app-html
+  namespace: default
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>EKS ALB Test Application</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+            }
+            .container {
+                background: rgba(255, 255, 255, 0.15);
+                padding: 40px;
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            }
+            h1 {
+                color: #fff;
+                text-align: center;
+                margin-bottom: 30px;
+                font-size: 2.5em;
+            }
+            .info {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 20px;
+                margin: 15px 0;
+                border-radius: 8px;
+                border-left: 5px solid #ffd700;
+                font-size: 1.1em;
+            }
+            .label {
+                font-weight: bold;
+                color: #ffd700;
+                display: inline-block;
+                min-width: 150px;
+            }
+            .value {
+                color: #fff;
+            }
+            .timestamp {
+                font-size: 0.9em;
+                color: #e0e0e0;
+                margin-top: 30px;
+                text-align: center;
+                font-style: italic;
+            }
+            .refresh-note {
+                background: rgba(255, 215, 0, 0.2);
+                padding: 15px;
+                border-radius: 8px;
+                margin-top: 20px;
+                text-align: center;
+                border: 2px solid #ffd700;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 EKS ALB Test Application</h1>
+            <div class="info">
+                <span class="label">Pod Name:</span> 
+                <span class="value" id="pod-name">Loading...</span>
+            </div>
+            <div class="info">
+                <span class="label">Pod Namespace:</span> 
+                <span class="value" id="pod-namespace">Loading...</span>
+            </div>
+            <div class="info">
+                <span class="label">Pod IP:</span> 
+                <span class="value" id="pod-ip">Loading...</span>
+            </div>
+            <div class="info">
+                <span class="label">Node Name:</span> 
+                <span class="value" id="node-name">Loading...</span>
+            </div>
+            <div class="info">
+                <span class="label">Request Time:</span> 
+                <span class="value" id="timestamp">Loading...</span>
+            </div>
+            <div class="refresh-note">
+                🔄 Refresh the page to see load balancing across different pods!
+            </div>
+            <div class="timestamp">
+                This demonstrates AWS Application Load Balancer integration with EKS
+            </div>
+        </div>
+        <script>
+            // Fetch pod info from /pod-info endpoint
+            fetch('/pod-info')
+                .then(response => response.text())
+                .then(data => {
+                    const lines = data.split('\n');
+                    lines.forEach(line => {
+                        if (line.startsWith('Pod:')) {
+                            document.getElementById('pod-name').textContent = line.split(':')[1].trim();
+                        } else if (line.startsWith('Namespace:')) {
+                            document.getElementById('pod-namespace').textContent = line.split(':')[1].trim();
+                        } else if (line.startsWith('IP:')) {
+                            document.getElementById('pod-ip').textContent = line.split(':')[1].trim();
+                        } else if (line.startsWith('Node:')) {
+                            document.getElementById('node-name').textContent = line.split(':')[1].trim();
+                        }
+                    });
+                })
+                .catch(() => {
+                    // Fallback if endpoint not available
+                    document.getElementById('pod-name').textContent = 'N/A';
+                    document.getElementById('pod-namespace').textContent = 'default';
+                    document.getElementById('pod-ip').textContent = 'N/A';
+                    document.getElementById('node-name').textContent = 'N/A';
+                });
+            
+            // Update timestamp
+            document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        </script>
+    </body>
+    </html>
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        location / {
+            try_files $uri $uri/ =404;
+        }
+        
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        location /pod-info {
+            access_log off;
+            default_type text/plain;
+            return 200 "Pod: $pod_name\nNamespace: $pod_namespace\nIP: $pod_ip\nNode: $node_name\n";
+        }
+    }
+

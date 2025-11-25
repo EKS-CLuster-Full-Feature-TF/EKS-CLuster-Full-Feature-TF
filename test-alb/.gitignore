@@ -1,0 +1,4 @@
+# Ignore any temporary test files
+*.log
+*.tmp
+

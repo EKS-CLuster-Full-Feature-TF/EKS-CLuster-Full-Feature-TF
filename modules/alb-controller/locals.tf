@@ -4,11 +4,5 @@ locals {
     Application = var.app_name
     Terraform   = true
   }
-
-  eks_tags = {
-    Environment = var.env
-    Application = var.app_name
-  }
 }
 
-  

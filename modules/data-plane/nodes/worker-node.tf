@@ -1,6 +1,6 @@
 resource "aws_eks_node_group" "nodes" {
-    cluster_name    = local.cluster_name
-    node_group_name = "${local.cluster_name}-node-group"
+    cluster_name    = var.cluster_name
+    node_group_name = "${var.cluster_name}-node-group"
     node_role_arn   =  aws_iam_role.worker_nodes_role.arn
     subnet_ids = var.subnet_ids
     capacity_type  = var.capacity_type
@@ -30,7 +30,10 @@ resource "aws_eks_node_group" "nodes" {
     Application = var.app_name
     Terraform   = true
     # ensure each EC2 instance created by the EKS node group gets a proper Name tag like mycluster-worker-node
-    Name        = "${local.cluster_name}-worker-node"
+    Name        = "${var.cluster_name}-worker-node"
   }
-  depends_on = [ aws_iam_role.worker_nodes_role ]
+  depends_on = [
+    aws_iam_role.worker_nodes_role,
+    aws_launch_template.launch_template
+  ]
 }

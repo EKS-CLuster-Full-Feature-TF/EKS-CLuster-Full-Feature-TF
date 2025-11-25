@@ -1,0 +1,46 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-app
+  namespace: default
+  annotations:
+    # Use AWS Load Balancer Controller
+    kubernetes.io/ingress.class: alb
+    # Create internet-facing ALB
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Use IP target type (required for Fargate or when using VPC CNI)
+    alb.ingress.kubernetes.io/target-type: ip
+    # Health check configuration
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    # SSL/TLS (optional - uncomment if you have ACM certificate)
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:region:account:certificate/cert-id
+    # alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # Additional annotations
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'  # Use with SSL
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true
+    # Tags for the ALB
+    alb.ingress.kubernetes.io/tags: |
+      Environment=prod,
+      Application=EKS-squad-1,
+      ManagedBy=terraform
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: test-app
+            port:
+              number: 80
+

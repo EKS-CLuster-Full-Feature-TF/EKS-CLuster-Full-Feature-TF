@@ -123,4 +123,14 @@ variable "label" {
   default = "nodes"
 }
 
+########################################
+# ALB Controller Settings
+########################################
+
+variable "alb_controller_version" {
+  description = "Version of AWS Load Balancer Controller Helm chart"
+  type        = string
+  default     = "1.8.0"
+}
+
 #variable "subnet_ids" {}
